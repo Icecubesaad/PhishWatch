@@ -67,43 +67,23 @@ def get_ssl_certificate(domain):
     return None
 
 def is_url_google_indexed(url):
-  """
-  Checks if a URL is likely indexed by Google using a heuristic approach.
-
-  Args:
-      url (str): The full URL to check.
-
-  Returns:
-      bool: True if the URL is likely indexed, False otherwise.
-  """
-
-  user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'  # Example user agent
-  headers = {'User-Agent': user_agent}
-
-  # Search for the exact URL (enhanced to potentially handle variations)
-  response = requests.get(f"https://www.google.com/search?q={url} OR intitle:{url.split('/')[-1]}", headers=headers)
-  soup = BeautifulSoup(response.content, 'html.parser')
-
-  url_indexed = any(
-      result.text.strip() == url or url.split('/')[-1] in result.text.strip()  # Check exact match or title match
-      for result in soup.find_all('a'))
-
-  return url_indexed
-
-def is_domain_google_indexed(domain):
-    """
-    Checks if a domain is likely indexed by Google using a heuristic approach.
-
-    Args:
-      domain (str): The domain name to check (e.g., "www.example.com").
-
-    Returns:
-    bool: True if the domain is likely indexed, False otherwise.
-    """
-    user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'  # Example user agent
+    user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     headers = {'User-Agent': user_agent}
 
-  # Search for the domain (enhanced to potentially handle subdomains)
+    response = requests.get(f"https://www.google.com/search?q={url} OR intitle:{url.split('/')[-1]}", headers=headers)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    url_indexed = any(
+        result.text.strip() == url or url.split('/')[-1] in result.text.strip()
+        for result in soup.find_all('a')
+    )
+
+    return url_indexed
+
+def is_domain_google_indexed(domain):
+    user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+    headers = {'User-Agent': user_agent}
+
     response = requests.get(f"https://www.google.com/search?q=site:{domain} OR site:www.{domain}", headers=headers)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -118,13 +98,9 @@ def extract_features(url):
         path = parsed_url.path
         query = parsed_url.query
 
-        # Check if domain is in IP address format
         domain_in_ip = bool(re.match(r"^\d{1,3}(\.\d{1,3}){3}$", domain))
-
-        # Check if domain contains the keywords "server" or "client"
         server_client_domain = "server" in domain or "client" in domain
 
-        # URL features
         url_features = count_characters(url)
         url_features.update({
             "qty_tld_url": len(parsed_url.hostname.split('.')[-1]) if parsed_url.hostname else 0,
@@ -132,7 +108,6 @@ def extract_features(url):
         })
         url_features = {f"{k}_url": v for k, v in url_features.items()}
 
-        # Domain features
         domain_features = count_characters(domain)
         domain_features.update({
             "qty_vowels_domain": sum(1 for char in domain if char in 'aeiouAEIOU'),
@@ -142,7 +117,6 @@ def extract_features(url):
         })
         domain_features = {f"{k}_domain": v for k, v in domain_features.items()}
 
-        # Directory and File components
         if '/' in path:
             directory, file = path.rsplit('/', 1)
         else:
@@ -156,7 +130,6 @@ def extract_features(url):
         file_features["file_length"] = len(file)
         file_features = {f"qty_{k}_file": v for k, v in file_features.items()}
 
-        # Query Parameters
         params_features = count_characters(query)
         params_features.update({
             "params_length": len(query),
@@ -165,10 +138,8 @@ def extract_features(url):
         })
         params_features = {f"{k}_params": v for k, v in params_features.items()}
 
-        # Email detection in URL
         email_in_url = bool(re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', url))
 
-        # External features
         try:
             whois_info = whois.whois(domain)
             creation_date = whois_info.creation_date[0] if isinstance(whois_info.creation_date, list) else whois_info.creation_date
@@ -210,14 +181,10 @@ def extract_features(url):
         }
         df_features = pd.DataFrame([features])
         df_features.columns = [''] * len(df_features.columns)
-        # Replace True with 1 and False with 0
         pd.set_option('future.no_silent_downcasting', True)
         df_features = df_features.replace({True: 1, False: 0})
         return df_features
 
     except Exception as e:
-        # Print the exception for debugging purposes (optional)
         print(f"An error occurred: {e}")
-
-        # Return False if any exception occurs
-        return False
+        return None
